@@ -39,7 +39,6 @@ CNode* ConnectNode(CAddress addrConnect, const char *strDest = NULL);
 void MapPort();
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError=REF(std::string()));
-void StartTor(void* parg);
 void StartNode(void* parg);
 bool StopNode();
 
