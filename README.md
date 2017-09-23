@@ -1,3 +1,5 @@
+update 20170923 - below are the original specs of the coin ... these will be changed as we continue development ... the first major change currently is complete removal of tor ... we are still testing - and building the seednodes for support of ipv4 only ( without tor ) ... specs will change also when the next hardfork comes about ... #crysx
+
 SweepStakeCoin
 SWEEP
 
@@ -5,7 +7,7 @@ SWEEP
 - JHA algorithm for PoW
 - 3 transaction confirmations 
 - 50 minted block confirmations
-- Total coins will be around 2 billions after 10 years.
+- Total coins will be around 2 billion after 10 years.
 - Connection port 17570, RPC port 17571
 
 PoW:
