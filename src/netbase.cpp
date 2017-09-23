@@ -29,8 +29,6 @@ enum Network ParseNetwork(std::string net) {
     boost::to_lower(net);
     if (net == "ipv4") return NET_IPV4;
     if (net == "ipv6") return NET_IPV6;
-    if (net == "tor")  return NET_TOR;
-    if (net == "i2p")  return NET_I2P;
     return NET_UNROUTABLE;
 }
 
@@ -58,7 +56,7 @@ void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
 bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nMaxSolutions, bool fAllowLookup)
 {
     vIP.clear();
-
+/*
     {
         CNetAddr addr;
         if (addr.SetSpecial(std::string(pszName))) {
@@ -66,7 +64,7 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
             return true;
         }
     }
-
+*/
     struct addrinfo aiHint;
     memset(&aiHint, 0, sizeof(struct addrinfo));
 
@@ -564,7 +562,7 @@ void CNetAddr::SetIP(const CNetAddr& ipIn)
 static const unsigned char pchOnionCat[] = {0xFD,0x87,0xD8,0x7E,0xEB,0x43};
 static const unsigned char pchGarliCat[] = {0xFD,0x60,0xDB,0x4D,0xDD,0xB5};
 
-bool CNetAddr::SetSpecial(const std::string &strName)
+/*bool CNetAddr::SetSpecial(const std::string &strName)
 {
     if (strName.size()>6 && strName.substr(strName.size() - 6, 6) == ".onion") {
         std::vector<unsigned char> vchAddr = DecodeBase32(strName.substr(0, strName.size() - 6).c_str());
@@ -585,7 +583,7 @@ bool CNetAddr::SetSpecial(const std::string &strName)
         return true;
     }
     return false;
-}
+}*/
 
 CNetAddr::CNetAddr()
 {
@@ -633,7 +631,7 @@ bool CNetAddr::IsIPv4() const
 
 bool CNetAddr::IsIPv6() const
 {
-    return (!IsIPv4() && !IsTor() && !IsI2P());
+    return (!IsIPv4());
 }
 
 bool CNetAddr::IsRFC1918() const
@@ -692,15 +690,15 @@ bool CNetAddr::IsRFC4843() const
     return (GetByte(15) == 0x20 && GetByte(14) == 0x01 && GetByte(13) == 0x00 && (GetByte(12) & 0xF0) == 0x10);
 }
 
-bool CNetAddr::IsTor() const
+/*bool CNetAddr::IsTor() const
 {
     return (memcmp(ip, pchOnionCat, sizeof(pchOnionCat)) == 0);
-}
+}*/
 
-bool CNetAddr::IsI2P() const
+/*bool CNetAddr::IsI2P() const
 {
     return (memcmp(ip, pchGarliCat, sizeof(pchGarliCat)) == 0);
-}
+}*/
 
 bool CNetAddr::IsLocal() const
 {
@@ -760,7 +758,7 @@ bool CNetAddr::IsValid() const
 
 bool CNetAddr::IsRoutable() const
 {
-    return IsValid() && !(IsRFC1918() || IsRFC3927() || IsRFC4862() || (IsRFC4193() && !IsTor() && !IsI2P()) || IsRFC4843() || IsLocal());
+    return IsValid() && !(IsRFC1918() || IsRFC3927() || IsRFC4862() || IsRFC4193() || IsRFC4843() || IsLocal());
 }
 
 enum Network CNetAddr::GetNetwork() const
@@ -771,21 +769,21 @@ enum Network CNetAddr::GetNetwork() const
     if (IsIPv4())
         return NET_IPV4;
 
-    if (IsTor())
+/*    if (IsTor())
         return NET_TOR;
 
     if (IsI2P())
-        return NET_I2P;
+        return NET_I2P; */
 
     return NET_IPV6;
 }
 
 std::string CNetAddr::ToStringIP() const
 {
-    if (IsTor())
+/*    if (IsTor())
         return EncodeBase32(&ip[6], 10) + ".onion";
     if (IsI2P())
-        return EncodeBase32(&ip[6], 10) + ".oc.b32.i2p";
+        return EncodeBase32(&ip[6], 10) + ".oc.b32.i2p"; */
     CService serv(*this, 0);
 #ifdef USE_IPV6
     struct sockaddr_storage sockaddr;
@@ -887,7 +885,7 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
         vchRet.push_back(GetByte(2) ^ 0xFF);
         return vchRet;
     }
-    else if (IsTor())
+/*    else if (IsTor())
     {
         nClass = NET_TOR;
         nStartByte = 6;
@@ -898,7 +896,7 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
         nClass = NET_I2P;
         nStartByte = 6;
         nBits = 4;
-    }
+    } */
     // for he.net, use /36 groups
     else if (GetByte(15) == 0x20 && GetByte(14) == 0x11 && GetByte(13) == 0x04 && GetByte(12) == 0x70)
         nBits = 36;
@@ -978,17 +976,6 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const
         case NET_IPV4:   return REACH_IPV4;
         case NET_IPV6:   return fTunnel ? REACH_IPV6_WEAK : REACH_IPV6_STRONG; // only prefer giving our IPv6 address if it's not tunnelled
         }
-    case NET_TOR:
-        switch(ourNet) {
-        default:         return REACH_DEFAULT;
-        case NET_IPV4:   return REACH_IPV4; // Tor users can connect to IPv4 as well
-        case NET_TOR:    return REACH_PRIVATE;
-        }
-    case NET_I2P:
-        switch(ourNet) {
-        default:         return REACH_DEFAULT;
-        case NET_I2P:    return REACH_PRIVATE;
-        }
     case NET_TEREDO:
         switch(ourNet) {
         default:          return REACH_DEFAULT;
@@ -1004,8 +991,6 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const
         case NET_TEREDO:  return REACH_TEREDO;
         case NET_IPV6:    return REACH_IPV6_WEAK;
         case NET_IPV4:    return REACH_IPV4;
-        case NET_I2P:     return REACH_PRIVATE; // assume connections from unroutable addresses are
-        case NET_TOR:     return REACH_PRIVATE; // either from Tor/I2P, or don't care about our address
         }
     }
 }
@@ -1162,7 +1147,7 @@ std::string CService::ToStringPort() const
 
 std::string CService::ToStringIPPort() const
 {
-    if (IsIPv4() || IsTor() || IsI2P()) {
+    if (IsIPv4()) {
         return ToStringIP() + ":" + ToStringPort();
     } else {
         return "[" + ToStringIP() + "]:" + ToStringPort();

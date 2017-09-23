@@ -36,8 +36,6 @@ void ThreadOpenAddedConnections2(void* parg);
 void ThreadMapPort2(void* parg);
 #endif
 void ThreadDNSAddressSeed2(void* parg);
-void ThreadTorNet2(void* parg);
-void ThreadOnionSeed2(void* parg);
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false);
 
 
@@ -52,7 +50,6 @@ struct LocalServiceInfo {
 bool fClient = false;
 bool fDiscover = true;
 bool fUseUPnP = false;
-bool fTorEnabled = true;
 uint64_t nLocalServices = (fClient ? 0 : NODE_NETWORK);
 static CCriticalSection cs_mapLocalHost;
 static map<CNetAddr, LocalServiceInfo> mapLocalHost;
@@ -579,41 +576,6 @@ void CNode::copyStats(CNodeStats &stats)
 
 
 
-void ThreadTorNet(void* parg)
-{
-    // Make this thread recognisable as the connection opening thread
-    RenameThread("britcoin-tornet");
-
-    try
-    {
-        vnThreadsRunning[THREAD_TORNET]++;
-        ThreadTorNet2(parg);
-        vnThreadsRunning[THREAD_TORNET]--;
-    }
-    catch (std::exception& e) {
-        vnThreadsRunning[THREAD_TORNET]--;
-        PrintException(&e, "ThreadTorNet()");
-    } catch (...) {
-        vnThreadsRunning[THREAD_TORNET]--;
-        PrintException(NULL, "ThreadTorNet()");
-    }
-    printf("ThreadTorNet exited\n");
-}
-
-void ThreadTorNet2(void* parg) {
-    std::string logDecl = "notice file " + GetDefaultDataDir().string() + "/tor/tor.log";
-    char *argvLogDecl = (char*) logDecl.c_str();
-
-    char* argv[] = {
-        "tor",
-        "--hush",
-        "--Log",
-        argvLogDecl
-    };
-
-    tor_main(4, argv);
-}
-
 void ThreadSocketHandler(void* parg)
 {
     // Make this thread recognisable as the networking thread
@@ -1126,7 +1088,6 @@ static const char *strDNSSeed[][2] = {
 
 // hidden service seeds
 static const char *strMainNetOnionSeed[][1] = {
-    {"pgpc4wtqm2ar4tbm.onion"}, 
     {NULL}
 };
 
@@ -1184,61 +1145,6 @@ void ThreadDNSAddressSeed2(void* parg)
 
     printf("%d addresses found from DNS seeds\n", found);
 }
-
-void ThreadOnionSeed(void* parg)
-{
-    // Make this thread recognisable as the DNS seeding thread
-    RenameThread("SweepstakeCoin-dnsseed");
-
-    try
-    {
-        vnThreadsRunning[THREAD_ONIONSEED]++;
-        ThreadOnionSeed2(parg);
-        vnThreadsRunning[THREAD_ONIONSEED]--;
-    }
-    catch (std::exception& e) {
-        vnThreadsRunning[THREAD_ONIONSEED]--;
-        PrintException(&e, "ThreadOnionSeed()");
-    } catch (...) {
-        vnThreadsRunning[THREAD_ONIONSEED]--;
-        throw; // support pthread_cancel()
-    }
-    printf("ThreadOnionSeed exited\n");
-}
-
-void ThreadOnionSeed2(void* parg)
-{
-    printf("ThreadOnionSeed started\n");
-
-    static const char *(*strOnionSeed)[1] = strMainNetOnionSeed;
-    int found = 0;
-
-    printf("Loading addresses from .onion seeds\n");
-
-    for (unsigned int seed_idx = 0; strOnionSeed[seed_idx][0] != NULL; seed_idx++) {
-        CNetAddr parsed;
-        if (!parsed.SetSpecial(strOnionSeed[seed_idx][0])) {
-            throw runtime_error("ThreadOnionSeed() : invalid .onion seed");
-        }
-        int nOneDay = 24*3600;
-        CAddress addr = CAddress(CService(parsed, GetDefaultPort()));
-        addr.nTime = GetTime() - 3*nOneDay - GetRand(4*nOneDay); // use a random age between 3 and 7 days old
-        found++;
-        addrman.Add(addr, parsed);
-    }
-
-    printf("%d addresses found from .onion seeds\n", found);
-}
-
-
-
-
-
-
-
-
-
-
 
 
 unsigned int pnSeed[] =
@@ -1846,11 +1752,6 @@ void static Discover()
         NewThread(ThreadGetMyExternalIP, NULL);
 }
 
-void StartTor(void* parg)
-{
-    if (!NewThread(ThreadTorNet, NULL))
-        printf("Error: NewThread(ThreadTorNet) failed\n");
-}
 
 void StartNode(void* parg)
 {
@@ -1880,12 +1781,6 @@ void StartNode(void* parg)
 
     int isfTor = GetArg("-dontuse", 1);
 	
-    if (!(isfTor == 1) || (fTorEnabled != 1))
-        	printf(".onion seeding disabled\n");
-    else
-        if (!NewThread(ThreadOnionSeed, NULL))
-            printf("Error: NewThread(ThreadOnionSeed) failed\n");
-
     // Map ports with UPnP
     if (fUseUPnP)
         MapPort();
@@ -1938,7 +1833,6 @@ bool StopNode()
             break;
         MilliSleep(20);
     } while(true);
-    if (vnThreadsRunning[THREAD_TORNET] > 0) printf("ThreadTorNet still running\n");
     if (vnThreadsRunning[THREAD_SOCKETHANDLER] > 0) printf("ThreadSocketHandler still running\n");
     if (vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0) printf("ThreadOpenConnections still running\n");
     if (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) printf("ThreadMessageHandler still running\n");
@@ -1948,7 +1842,6 @@ bool StopNode()
     if (vnThreadsRunning[THREAD_UPNP] > 0) printf("ThreadMapPort still running\n");
 #endif
     if (vnThreadsRunning[THREAD_DNSSEED] > 0) printf("ThreadDNSAddressSeed still running\n");
-    if (vnThreadsRunning[THREAD_ONIONSEED] > 0) printf("ThreadOnionSeed still running\n");
     if (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0) printf("ThreadOpenAddedConnections still running\n");
     if (vnThreadsRunning[THREAD_DUMPADDRESS] > 0) printf("ThreadDumpAddresses still running\n");
     if (vnThreadsRunning[THREAD_STAKE_MINER] > 0) printf("ThreadStakeMiner still running\n");

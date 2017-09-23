@@ -9,7 +9,6 @@
 #include "init.h"
 #include "util.h"
 #include "ui_interface.h"
-#include "tor/anonymize.h"
 #include "checkpoints.h"
 #include "smessage.h"
 #include <boost/filesystem.hpp>
@@ -251,7 +250,7 @@ std::string HelpMessage()
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
         "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n" +
         "  -externalip=<ip>       " + _("Specify your own public address") + "\n" +
-        "  -onlynet=<net>         " + _("Only connect to nodes in network <net> (IPv4, IPv6 or Tor)") + "\n" +
+        "  -onlynet=<net>         " + _("Only connect to nodes in network <net> (IPv4 or IPv6)") + "\n" +
         "  -discover              " + _("Discover own IP address (default: 1 when listening and no -externalip)") + "\n" +
         "  -listen                " + _("Accept connections from outside (default: 1 if no -proxy or -connect)") + "\n" +
         "  -bind=<addr>           " + _("Bind to given address. Use [host]:port notation for IPv6") + "\n" +
@@ -403,7 +402,7 @@ bool AppInit2()
     }
 
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) {
-        // when only connecting to trusted nodes, do not seed via DNS, Tor, or listen by default
+        // when only connecting to trusted nodes, do not seed via DNS, or listen by default
         SoftSetBoolArg("-dnsseed", false);
         SoftSetBoolArg("-listen", false);
     }
@@ -581,27 +580,10 @@ bool AppInit2()
 
     // ********************************************************* Step 6: network initialization
 
-    uiInterface.InitMessage(_("Initialising Tor Network..."));
-    printf("Initialising Tor Network...\n");
-
     int nSocksVersion = GetArg("-socks", 5);
 
     if (nSocksVersion != 4 && nSocksVersion != 5)
         return InitError(strprintf(_("Unknown -socks proxy version requested: %i"), nSocksVersion));
-
-    int isfTor = GetArg("-dontuse", 1);
-
-    if (isfTor == 1)
-    {
-        std::set<enum Network> nets;
-        nets.insert(NET_TOR);
-
-        for (int n = 0; n < NET_MAX; n++) {
-            enum Network net = (enum Network)n;
-            if (!nets.count(net))
-                SetLimited(net);
-        }
-    }
 
     if (mapArgs.count("-onlynet")) {
         std::set<enum Network> nets;
@@ -643,31 +625,10 @@ bool AppInit2()
         fProxy = true;
     }
 
-    // -tor can override normal proxy, -notor disables tor entirely
-    if (!(mapArgs.count("-tor") && mapArgs["-tor"] == "0") && (fProxy || mapArgs.count("-tor"))) {
-    CService addrOnion;
-
-        if (!mapArgs.count("-tor"))
-            addrOnion = addrProxy;
-        else
-        addrOnion = CService(mapArgs["-tor"], onion_port);
-
-        if (!addrOnion.IsValid())
-            return InitError(strprintf(_("Invalid -tor address: '%s'"), mapArgs["-tor"].c_str()));
-    } else {
-        addrOnion = CService("127.0.0.1", onion_port);
-    }
-
-    if (true) {
-        SetProxy(NET_TOR, addrOnion, 5);
-        SetReachable(NET_TOR);
-    }
-
     // see Step 2: parameter interactions for more information about these
     fNoListen = !GetBoolArg("-listen", true);
     fDiscover = GetBoolArg("-discover", true);
     fNameLookup = GetBoolArg("-dns", true);
-    fTorEnabled = GetArg("-dontuse", 1);
 #ifdef USE_UPNP
     fUseUPnP = GetBoolArg("-upnp", USE_UPNP);
 #endif
@@ -694,27 +655,8 @@ bool AppInit2()
                 fBound |= Bind(CService(inaddr_any, GetListenPort()), !fBound);
             }
 
-            if (isfTor == 1)
-            {
-                CService addrBind;
-
-                if (!Lookup("127.0.0.1", addrBind, GetListenPort(), false))
-                    return InitError(strprintf(_("Cannot resolve binding address: '%s'"), "127.0.0.1"));
-
-                fBound |= Bind(addrBind);
-            }
-
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
-    }
-
-    if (isfTor == 1)
-    {
-        if (!NewThread(StartTor, NULL))
-                InitError(_("Error: could not start tor node"));
-        wait_initialized();
-        uiInterface.InitMessage(_("Initialising Tor Network..."));
-        printf("Initialising Tor Network...\n");
     }
 
 
@@ -727,20 +669,6 @@ bool AppInit2()
                 return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr.c_str()));
             AddLocal(CService(strAddr, GetListenPort(), fNameLookup), LOCAL_MANUAL);
         }
-    }
-
-    if (isfTor == 1)
-    {
-        string automatic_onion;
-        filesystem::path const hostname_path = GetDefaultDataDir() / "onion" / "hostname";
-
-        if (!filesystem::exists(hostname_path)) {
-            return InitError(_("No external address found."));
-        }
-
-        ifstream file(hostname_path.string().c_str());
-        file >> automatic_onion;
-        AddLocal(CService(automatic_onion, GetListenPort(), fNameLookup), LOCAL_MANUAL);
     }
 
     if (mapArgs.count("-reservebalance")) // SweepstakeCoin: reserve balance amount

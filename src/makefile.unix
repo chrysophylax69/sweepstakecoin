@@ -4,7 +4,7 @@
 
 # Version and updates by mammix2 (mammix2@hotmail.com)
 
-USE_UPNP:=0
+USE_UPNP:=-
 USE_IPV6:=1
 
 LINK:=$(CXX)
@@ -12,7 +12,7 @@ ARCH:=$(system lscpu | head -n 1 | awk '{print $2}')
 
 DEFS=-DBOOST_SPIRIT_THREADSAFE
 
-DEFS += $(addprefix -I,$(CURDIR) $(CURDIR)/obj $(CURDIR)/tor $(CURDIR)/json $(BOOST_INCLUDE_PATH) $(BDB_INCLUDE_PATH) $(OPENSSL_INCLUDE_PATH))
+DEFS += $(addprefix -I,$(CURDIR) $(CURDIR)/obj $(CURDIR)/json $(BOOST_INCLUDE_PATH) $(BDB_INCLUDE_PATH) $(OPENSSL_INCLUDE_PATH))
 LIBS = $(addprefix -L,$(BOOST_LIB_PATH) $(BDB_LIB_PATH) $(OPENSSL_LIB_PATH))
 
 LMODE = dynamic
@@ -107,80 +107,6 @@ $(DEBUGFLAGS) $(DEFS) $(HARDENING) $(CXXFLAGS)
 xLDFLAGS=$(LDHARDENING) $(LDFLAGS)
 
 OBJS= \
-	obj/address.o \
-	obj/addressmap.o \
-	obj/aes.o \
-	obj/backtrace.o \
-	obj/buffers.o \
-	obj/channel.o \
-	obj/channeltls.o \
-	obj/circpathbias.o \
-	obj/circuitbuild.o \
-	obj/circuitlist.o \
-	obj/circuitmux.o \
-	obj/circuitmux_ewma.o \
-	obj/circuitstats.o \
-	obj/circuituse.o \
-	obj/command.o \
-	obj/compat.o \
-	obj/compat_libevent.o \
-	obj/config.o \
-	obj/config_codedigest.o \
-	obj/confparse.o \
-	obj/connection.o \
-	obj/connection_edge.o \
-	obj/connection_or.o \
-	obj/container.o \
-	obj/control.o \
-	obj/cpuworker.o \
-	obj/crypto.o \
-	obj/crypto_curve25519.o \
-	obj/crypto_format.o \
-	obj/curve25519-donna.o \
-	obj/di_ops.o \
-	obj/directory.o \
-	obj/dirserv.o \
-	obj/dirvote.o \
-	obj/dns.o \
-	obj/dnsserv.o \
-	obj/entrynodes.o \
-	obj/ext_orport.o \
-	obj/fp_pair.o \
-	obj/geoip.o \
-	obj/hibernate.o \
-	obj/log.o \
-	obj/memarea.o \
-	obj/mempool.o \
-	obj/microdesc.o \
-	obj/networkstatus.o \
-	obj/nodelist.o \
-	obj/onion.o \
-	obj/onion_fast.o \
-	obj/onion_main.o \
-	obj/onion_ntor.o \
-	obj/onion_tap.o \
-	obj/policies.o \
-	obj/procmon.o \
-	obj/reasons.o \
-	obj/relay.o \
-	obj/rendclient.o \
-	obj/rendcommon.o \
-	obj/rendmid.o \
-	obj/rendservice.o \
-	obj/rephist.o \
-	obj/replaycache.o \
-	obj/router.o \
-	obj/routerlist.o \
-	obj/routerparse.o \
-	obj/routerset.o \
-	obj/sandbox.o \
-	obj/statefile.o \
-	obj/status.o \
-	obj/torgzip.o \
-	obj/tortls.o \
-	obj/tor_util.o \
-	obj/transports.o \
-	obj/util_codedigest.o \
 	obj/groestl.o \
 	obj/blake.o \
 	obj/skein.o \
@@ -273,28 +199,12 @@ obj/%.o: %.c
 	-e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	rm -f $(@:%.o=%.d)
 
-obj/%.o: tor/%.c
-	$(CC) -c $(xCXXFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
-	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
-	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-	-e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
-	rm -f $(@:%.o=%.d)
-
-obj/anonymize.o: tor/anonymize.cpp
-	$(CXX) -c $(xCXXFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
-	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
-	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-	-e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
-	rm -f $(@:%.o=%.d)
-
-SweepstakeCoind: $(OBJS:obj/%=obj/%) obj/anonymize.o
+SweepstakeCoind: $(OBJS:obj/%=obj/%)
 	$(LINK) $(xCXXFLAGS) -o $@ $^ $(xLDFLAGS) $(LIBS)
 
 clean:
 	-rm -f SweepstakeCoind
 	-rm -f obj/*.o
-	-rm -f obj/tor/*.o
-	-rm -f obj/tor/*.P
 	-rm -f obj/*.P
 	-rm -f obj-test/*.o
 	-rm -f obj-test/*.P
